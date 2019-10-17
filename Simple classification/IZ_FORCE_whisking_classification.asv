@@ -65,11 +65,9 @@ end
 X = [X1 ; X2];
 [conv_whisk, conv_curve] = convolve_kernel_whisk_curve( KernelStruct, length(s.trialIds), dat);
 %% Create sine pulse target
-lambda=1000;
 z_pulse=zeros(zx,1);
 for t=1:length(zx)
-    if zx(t) == 1
-        z_pulse(t) = sin(2*pi
+    if 
     
 
 %% Test other target
