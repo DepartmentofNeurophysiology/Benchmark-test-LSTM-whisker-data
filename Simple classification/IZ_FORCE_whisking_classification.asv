@@ -28,7 +28,8 @@ for i=2:length(s.trialIds)
         dat(i).z = dat(i).timeVec;
         %dat(i).z(1)=0;
         for t=1:length(dat(i).timeVec)
-            if dat(i).pole_times(2) < dat(i).timeVec(t) && dat(i).timeVec(t) < dat(i).lick_times(1) % Time between pole not more in reach and first lick
+            %if dat(i).pole_times(2) < dat(i).timeVec(t) && dat(i).timeVec(t) < dat(i).lick_times(1) % Time between pole not more in reach and first lick
+            if dat(i).pole_times(2) < dat(i).timeVec(t) % This puts target signal to +/- 1 for the rest of the trial
                 if dat(i).pole == 1
                     dat(i).z(t) = 1;            % Label correct output for pole
                 elseif dat(i).pole == -1
@@ -44,7 +45,7 @@ for i=2:length(s.trialIds)
 end
     
 save('whiskingstruct', 'dat')   
-%%
+%% Create input signals and target signals
 % Create one input array with all trials and create a supervisor that 
 % correctly labels the desired output for each time point of the input
 % array.
@@ -54,21 +55,24 @@ zx = [];
 count = 1;
 for i=1:length(s.trialIds)
     if dat(i).correct == 1 
-        if dat(i).lick_times ~= 0
-        X1 = [X1, dat(i).thetaVec];          % takes theta values per correct trial
-        X2 = [X2, dat(i).kappaVec];          % takes kappa values per correct trial
-        zx = [zx, dat(i).z];
+        if dat(i).lick_times ~= 0   
+        X1 = [X1,zeros(1,5000), dat(i).thetaVec];          % takes theta values per correct trial
+        X2 = [X2,zeros(1,5000), dat(i).kappaVec];          % takes kappa values per correct trial
+        zx = [zx,zeros(1,5000), dat(i).z];
         count = count + 1;
         end
     end  
 end
 X = [X1 ; X2];
+%% Convolve with kernels
 [conv_whisk, conv_curve] = convolve_kernel_whisk_curve( KernelStruct, length(s.trialIds), dat);
 %% Create sine pulse target
-z_pulse=zeros(zx,1);
-for t=1:length(zx)
-    if 
-    
+% lambda=1000;
+% z_pulse=zeros(zx,1);
+% for t=1:length(zx)
+%     if zx(t) == 1
+%         z_pulse(t) = sin(2*pi
+%     
 
 %% Test other target
 %Load the data set for classification.  P contains class, z contains the points.  
@@ -118,7 +122,7 @@ h = zeros(N,1);
 r = zeros(N,1);
 hr = zeros(N,1);
 JD = zeros(N,1);
-%BPhi = 0.00*ones(N,1); % Ones or zeros?
+BPhi = 0.0*ones(N,1); % Ones or zeros?
 %-----Initialization---------------------------------------------
 v = vr+(vpeak-vr)*rand(N,1); %initial distribution 
 v_ = v; %These are just used for Euler integration, previous time step storage
@@ -139,13 +143,14 @@ icrit = nt;
 current = zeros(nt,1);
 RECB = zeros(nt,5);
 REC = zeros(nt,10);
-i=1;
+i=5000/dt;
 ilast = i ;
 I_list = zeros(nt,1);
 X(isnan(X)) = 0;
 z1=1*zx;
 in=1;
 z_plot=zeros(nt,1);
+I_c = zeros(nt,5);
 %% SIMULATION
 z_t = z1; % Set target function
 for i = ilast:1:nt
@@ -180,11 +185,11 @@ end
 if mod(i,step)==1
 if i > imin 
  if i < icrit 
-     %if z_t(in) ~= 0
+     if z_t(in) == 0 && sum(X(in,:))==0 || z_t(in) == 1 || z_t(in) == -1 % No RLS when there is input before pole withdrawn
          cd = Pinv*r;
          BPhi = BPhi - (cd*err');
          Pinv = Pinv -((cd)*(cd'))/( 1 + (r')*(cd));
-     %end
+     end
  end 
 end 
 end
@@ -196,11 +201,14 @@ v_ = v;  % sets v(t-1) = v for the next itteration of loop
 REC(i,:) = [v(1:5)',u(1:5)']; 
 current(i,:) = z; 
 I_list(i,:) = mean(I);
+%I_c(i,:) = Ein*X(in,:)'(1:5);
+I_c(i,:) = mean(Ein*X(in,:)');
+
 RECB(i,:)=BPhi(1:5);
 if mod(i,round(100/dt))==1 
 drawnow
-
 figure(2)
+subplot(2,1,1)
 plot(dt*(1:1:i),current(1:1:i,1),'r.','Linewidth',0.8), hold on 
 plot(dt*(1:1:i),z_plot(1:1:i),'g--','Linewidth',2), hold off
 ylim([-2,2])
@@ -208,6 +216,9 @@ xlim([dt*i-1000,dt*i])
 xlabel('Time')
 ylabel('Network Response')
 legend('Network Output','Target Signal')
+subplot(2,1,2)
+plot(dt*(1:1:i),I_c(1:1:i,1),'b','Linewidth',0.8)
+xlim([dt*i-1000,dt*i])
 pause(0.1)
 end   
 end
