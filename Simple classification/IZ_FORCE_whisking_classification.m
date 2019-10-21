@@ -19,7 +19,9 @@ for i=1:length(s.trialIds)
 end
     
 %% Plot to check
+
 plot_trial(5,dat);
+
 
 %% Create supervisor and input
 
@@ -66,13 +68,73 @@ end
 X = [X1 ; X2];
 %% Convolve with kernels
 [conv_whisk, conv_curve] = convolve_kernel_whisk_curve( KernelStruct, length(s.trialIds), dat);
-%% Create sine pulse target
-% lambda=1000;
-% z_pulse=zeros(zx,1);
-% for t=1:length(zx)
-%     if zx(t) == 1
-%         z_pulse(t) = sin(2*pi
-%     
+%% Create signal for only two trials
+% Take trial 5 and 8, pole is -1 and +1 respectively
+% Only take curvature for now, maybe learn to ignore angle later..?
+trial_5 = (dat(5).kappaVec-mean(dat(5).kappaVec))/std(dat(5).kappaVec);
+noNAN = dat(8).kappaVec;
+noNAN(isnan(noNAN)) = 0;
+trial_8 = (noNAN-mean(noNAN))/std(noNAN);
+pole_5 = dat(5).pole_times;
+pole_8 = dat(8).pole_times;
+time_5 = dat(5).timeVec;
+time_8 = dat(8).timeVec;
+%%
+X_5 = zeros(time_5(end),1);
+X_8 = zeros(time_8(end),1);
+i=1;
+for t=1:length(X_5)
+    X_5(t) = trial_5(i);
+    if mod(t,2) == 0
+        i = i + 1;
+    end
+end
+i = 1;
+for t=1:length(X_8)
+    X_8(t) = trial_8(i);
+    if mod(t,2) == 0
+        i = i + 1;
+    end
+end
+%% Only input between poles
+for t=1:length(X_5)
+    if t < pole_5(1) || t > pole_5(2)
+        X_5(t) = 0;
+    end
+end
+for t=1:length(X_8)
+    if t < pole_8(1) || t > pole_8(2)
+        X_8(t) = 0;
+    end
+end
+
+%%
+reset = 1000; % Time inbetween the trials
+pulse_length = 500; % Length of the sine pulse for target function
+amp = 2; % Amplitude of pulse
+n=10; % Number of times a trial is repeated
+X_all = [];
+z_all = [];
+for t=1:n
+    trial = randi([0,1],1,1);
+    if trial == 0 % take trial 5
+        l_t = length(X_5) + reset;
+        z_t = zeros(l_t,1);
+        z_t(pole_5(2):1:pole_5(2)+pulse_length) = amp*sin((-pi/pulse_length)*(0:1:pulse_length));
+        z_all = [z_all z_t'];
+        X_all = [X_all X_5' zeros(reset,1)'];
+    else % take trial 8
+        l_t = length(X_8) + reset;
+        z_t = zeros(l_t,1);
+        z_t(pole_8(2):1:pole_8(2)+pulse_length) = amp*sin((pi/pulse_length)*(0:1:pulse_length));
+        z_all = [z_all z_t'];
+        X_all = [X_all X_8' zeros(reset,1)'];
+    end
+end
+plot(z_all)
+hold on
+plot(X_all)
+hold off
 
 %% Test other target
 %Load the data set for classification.  P contains class, z contains the points.  
@@ -94,7 +156,7 @@ end
 %%
 X=X';
 %% INITIALISE SIMULATION PARAMETERS
-T = length(X); %Total time 
+T = length(X_all); %Total time 
 dt = 0.05; %integration time step in ms
 nt = round(T/dt);
 N =  1000;  %number of neurons, 500 works
@@ -131,28 +193,30 @@ Q = 5*10^3; %Scale feedback term, Q in paper
 E = (2*rand(N,1)-1)*Q; %scale feedback term
 WE2 = 5*10^2; %scale input weights
 Psi = 2*pi*rand(N,1); 
-Ein = [cos(Psi),sin(Psi)]*WE2;
+%Ein = [cos(Psi),sin(Psi)]*WE2;
+Ein = randi([-WE2 WE2],N,1);
 z = 0; 
 tspike = zeros(nt,2);
 ns = 0;
 % RLS parameters.
 Pinv = eye(N)*30;
 step = 10;
-imin = round(10000/dt);
+imin = round(100/dt);
 icrit = nt;
 current = zeros(nt,1);
 RECB = zeros(nt,5);
 REC = zeros(nt,10);
-i=5000/dt;
+i=1;%5000/dt;
 ilast = i ;
 I_list = zeros(nt,1);
-X(isnan(X)) = 0;
-z1=1*zx;
-in=5000;
+%X(isnan(X)) = 0;
+%z1=1*zx;
+in=1;
 z_plot=zeros(nt,1);
 I_c = zeros(nt,5);
 %% SIMULATION
-z_t = z1; % Set target function
+z_t = z_all; % Set target function
+X = X_all';
 for i = ilast:1:nt
 if mod(i,1/dt) == 0 % this loop makes sure that only every 1 ms a new data point is presented, as dt = 0.05 ms
     in=in+1;
@@ -185,7 +249,8 @@ end
 if mod(i,step)==1
 if i > imin 
  if i < icrit 
-     if sum(X(in,:))==0 || z_t(in) == 1 || z_t(in) == -1 % No RLS when there is input before pole withdrawn
+     if z_t(in) ~= 0 || X(in,:) == 0
+     %if sum(X(in,:))==0 || z_t(in) == 1 || z_t(in) == -1 % No RLS when there is input before pole withdrawn
          cd = Pinv*r;
          BPhi = BPhi - (cd*err');
          Pinv = Pinv -((cd)*(cd'))/( 1 + (r')*(cd));
@@ -219,7 +284,7 @@ legend('Network Output','Target Signal')
 subplot(2,1,2)
 plot(dt*(1:1:i),I_c(1:1:i,1),'b','Linewidth',0.8)
 xlim([dt*i-1000,dt*i])
-pause(0.1)
+%pause(0.1)
 end   
 end
 
