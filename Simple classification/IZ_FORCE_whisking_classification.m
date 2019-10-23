@@ -5,6 +5,7 @@ clc
 load('an197522_2013_03_08_session');
 load('Kernels');
 load('whiskingstruct');
+load('weights');
 
 %% Load data of whisking
 for i=1:length(s.trialIds)
@@ -20,7 +21,7 @@ end
     
 %% Plot to check
 
-plot_trial(5,dat);
+plot_trial(8,dat);
 
 
 %% Create supervisor and input
@@ -89,6 +90,7 @@ for t=1:length(X_5)
         i = i + 1;
     end
 end
+%%
 i = 1;
 for t=1:length(X_8)
     X_8(t) = trial_8(i);
@@ -107,33 +109,59 @@ for t=1:length(X_8)
         X_8(t) = 0;
     end
 end
-
-%%
-reset = 1000; % Time inbetween the trials
-pulse_length = 500; % Length of the sine pulse for target function
+%% Remove zeros
+Xnz_5 = [];
+Xnz_8 = [];
+for t=1:length(X_5)
+    if X_5(t) ~= 0
+        Xnz_5 = [Xnz_5, X_5(t)];
+    end
+end
+for t=1:length(X_8)
+    if X_8(t) ~= 0
+        Xnz_8 = [Xnz_8, X_8(t)];
+    end
+end
+    
+%% Target pulse
+reset = 500; % Time inbetween the trials
+pulse_length = 300; % Length of the sine pulse for target function
 amp = 2; % Amplitude of pulse
-n=10; % Number of times a trial is repeated
+decay = 100;
+y=amp*exp(-(0:1:pulse_length)./decay);
+plot(y)
+%%
+
+n=50; % Number of times a trial is repeated
 X_all = [];
 z_all = [];
 for t=1:n
     trial = randi([0,1],1,1);
     if trial == 0 % take trial 5
-        l_t = length(X_5) + reset;
+        l_t = length(Xnz_5) + reset;
         z_t = zeros(l_t,1);
-        z_t(pole_5(2):1:pole_5(2)+pulse_length) = amp*sin((-pi/pulse_length)*(0:1:pulse_length));
+        %z_t(pole_5(2):1:pole_5(2)+pulse_length) = amp*sin((-pi/pulse_length)*(0:1:pulse_length));
+        %z_t(pole_5(2):1:pole_5(2)+pulse_length) =  -1.5*fpdf(0.05*(0:1:pulse_length),10,5);
+        %z_t(length(Xnz_5):1:length(Xnz_5)+pulse_length) =  -3*fpdf(0.05*(0:1:pulse_length),10,5);
+        z_t(length(Xnz_5):1:length(Xnz_5)+pulse_length) =  -amp*exp(-(0:1:pulse_length)./decay);
         z_all = [z_all z_t'];
-        X_all = [X_all X_5' zeros(reset,1)'];
+        X_all = [X_all Xnz_5 zeros(reset,1)'];
     else % take trial 8
-        l_t = length(X_8) + reset;
+        l_t = length(Xnz_8) + reset;
         z_t = zeros(l_t,1);
-        z_t(pole_8(2):1:pole_8(2)+pulse_length) = amp*sin((pi/pulse_length)*(0:1:pulse_length));
+        %z_t(pole_8(2):1:pole_8(2)+pulse_length) = amp*sin((pi/pulse_length)*(0:1:pulse_length));
+        %z_t(pole_8(2):1:pole_8(2)+pulse_length) =  1.5*fpdf(0.05*(0:1:pulse_length),10,5);
+        %z_t(length(Xnz_8):1:length(Xnz_8)+pulse_length) =  3*fpdf(0.05*(0:1:pulse_length),10,5);
+        z_t(length(Xnz_8):1:length(Xnz_8)+pulse_length) =  amp*exp(-(0:1:pulse_length)./decay);
         z_all = [z_all z_t'];
-        X_all = [X_all X_8' zeros(reset,1)'];
+        X_all = [X_all Xnz_8 zeros(reset,1)'];
     end
 end
+%%
+X_add = X_all + 0.5;
 plot(z_all)
 hold on
-plot(X_all)
+plot(X_add)
 hold off
 
 %% Test other target
@@ -157,9 +185,9 @@ end
 X=X';
 %% INITIALISE SIMULATION PARAMETERS
 T = length(X_all); %Total time 
-dt = 0.05; %integration time step in ms
+dt = 0.01; %integration time step in ms
 nt = round(T/dt);
-N =  1000;  %number of neurons, 500 works
+N =  50;  %number of neurons, 500 works
 % Izhikevich Parameters
 C = 250;
 vr = -60; 
@@ -184,29 +212,23 @@ h = zeros(N,1);
 r = zeros(N,1);
 hr = zeros(N,1);
 JD = zeros(N,1);
-BPhi = 0.01*ones(N,1); % Ones or zeros?
+
 %-----Initialization---------------------------------------------
 v = vr+(vpeak-vr)*rand(N,1); %initial distribution 
 v_ = v; %These are just used for Euler integration, previous time step storage
 IPSC = zeros(N,1);
 Q = 5*10^3; %Scale feedback term, Q in paper
 E = (2*rand(N,1)-1)*Q; %scale feedback term
-WE2 = 5*10^2; %scale input weights
-Psi = 2*pi*rand(N,1); 
-%Ein = [cos(Psi),sin(Psi)]*WE2;
-Ein = randi([-WE2 WE2],N,1);
 z = 0; 
 tspike = zeros(nt,2);
 ns = 0;
 % RLS parameters.
 Pinv = eye(N)*30;
 step = 10;
-imin = round(100/dt);
-icrit = nt;
 current = zeros(nt,1);
 RECB = zeros(nt,5);
 REC = zeros(nt,10);
-i=1;%5000/dt;
+i=1;%1;%5000/dt;
 ilast = i ;
 I_list = zeros(nt,1);
 %X(isnan(X)) = 0;
@@ -214,9 +236,20 @@ I_list = zeros(nt,1);
 in=1;
 z_plot=zeros(nt,1);
 I_c = zeros(nt,5);
+
+imin =  1000;%round(500/dt);
+icrit = nt/2;
+WE2 = 5*10^2; %scale input weights
+Psi = 2*pi*rand(N,1); 
+Ein = [cos(Psi),sin(Psi)]*WE2;
+Ein = randi([-WE2 WE2],N,1);
+BPhi =  0.1*ones(N,1); % Ones or zeros?
+Pinv = eye(N)*30;
+step = 5;
 %% SIMULATION
 z_t = z_all; % Set target function
-X = X_all';
+X = X_add';
+tic
 for i = ilast:1:nt
 if mod(i,1/dt) == 0 % this loop makes sure that only every 1 ms a new data point is presented, as dt = 0.05 ms
     in=in+1;
@@ -249,7 +282,7 @@ end
 if mod(i,step)==1
 if i > imin 
  if i < icrit 
-     if z_t(in) ~= 0 || X(in,:) == 0
+     if z_t(in) ~= 0 %Only RLS when z is not zero%|| X(in,:) == 0 % No RLS when there is input
      %if sum(X(in,:))==0 || z_t(in) == 1 || z_t(in) == -1 % No RLS when there is input before pole withdrawn
          cd = Pinv*r;
          BPhi = BPhi - (cd*err');
@@ -276,7 +309,7 @@ figure(2)
 subplot(2,1,1)
 plot(dt*(1:1:i),current(1:1:i,1),'r.','Linewidth',0.8), hold on 
 plot(dt*(1:1:i),z_plot(1:1:i),'g--','Linewidth',2), hold off
-ylim([-2,2])
+%ylim([-3,3])
 xlim([dt*i-1000,dt*i])
 xlabel('Time')
 ylabel('Network Response')
@@ -284,10 +317,15 @@ legend('Network Output','Target Signal')
 subplot(2,1,2)
 plot(dt*(1:1:i),I_c(1:1:i,1),'b','Linewidth',0.8)
 xlim([dt*i-1000,dt*i])
-%pause(0.1)
+ylim([-100,100])
+pause(0.2)
 end   
+if mod(i,1000) == 0
+     i
+     i/nt
+ end
 end
-
+toc
 
 
 
