@@ -49,18 +49,19 @@ SpikeTrain_hard_test = load('spikes_hard_test');                                
 WhiskerTrace_hard_test = load('WhiskerTrace_hard_test');                        % 'Hard' trials to test on
 
 %% Plot the curvature and angle trace to compare to the thalamic spike trains.
-% trials_train = [5 8 15 18 24 76 28 29 33 34 82 93];
-% trials_test = [2 7 19 25];
+trials_train = [5 8 15 18 24 76 28 29 33 34 82 93];
+trials_test = [2 7 19 25];
+trials = trials_train;
+% 
+% trials_train_hard = [5 8 15 18 24 76 28 29 33 34 82 93 30 50 71 83];
+% trials_test_hard = [64 73 84 87 91 100];
+% trials = trials_train_hard; 
+% WhiskerTrace = WhiskerTrace_hard_train.WhiskerTrace;                                  % This is the training set
+WhiskerTrace = WhiskerTrace_pole.WhiskerTrace;      % testing set
+% SpikeTrainStruct = SpikeTrain_hard_train.SpikeTrainStruct;
+SpikeTrainStruct = SpikeTrainStruct_pole.SpikeTrainStruct;
 
-trials_train_hard = [5 8 15 18 24 76 28 29 33 34 82 93 30 50 71 83];
-trials_test_hard = [64 73 84 87 91 100];
-trials = trials_train_hard; 
-WhiskerTrace = WhiskerTrace_hard_train.WhiskerTrace;                                  % This is the training set
-%WhiskerTrace = WhiskerTrace_test.WhiskerTrace      % testing set
-SpikeTrainStruct = SpikeTrain_hard_train.SpikeTrainStruct;
-%SpikeTrainStruct = SpikeTrainStruct_test.SpikeTrainStruct;
-
-nt = 14;      % Select which trial to plot
+nt = 5;      % Select which trial to plot
 figure(8)
 subplot(3,1,1)
 plot(WhiskerTrace.Recording{1,nt})
@@ -138,7 +139,7 @@ T = 1000;
 %% Create the array of neural input to the reservoir and the target function the output has to match.
 % The neural input is made by multiplying the spikes with the input
 % weights. 
-n_t = length(trials_train_hard);                                   % Number of trials that are repeated after each other. So the input becomes 'nt' long.
+n_t = length(trials_train);                                   % Number of trials that are repeated after each other. So the input becomes 'nt' long.
 pole = 1;                                  % This tells the funtion whether trials are just 'pole in reach' or the 'whole' trial.
 rate = 1.5;                                 % This is the average firing rate of the poisson input spikes 
 random = 0;                                 % Arrange trials randomly or not, if not random then n_t needs to equal the number of input trials.
@@ -283,18 +284,18 @@ title('Average population activity')
 
 %% Test trained network with learnt weights. Input the learned weights into the function so the network can classify the thalamic spike input.
 % select test data, these should be 'easy to classify' trials.
-n_t = 6;                                   % Number of trials.
+n_t = 4;                                   % Number of trials.
 pole = 1;                                  % This tells the funtion whether trials are just 'pole in reach' or the 'whole' trial.
 rate = 1.5;                                 % This is the average firing rate of the poisson input spikes 
 n_r = 10;                                    % Number of trials that are repeated after each other. So the input becomes 'nt' long.
 
-% SpikeTrainStruct = SpikeTrainStruct_test.SpikeTrainStruct;
-% WhiskerTrace = WhiskerTrace_test.WhiskerTrace;
-SpikeTrainStruct = SpikeTrain_hard_test.SpikeTrainStruct;
-WhiskerTrace = WhiskerTrace_hard_test.WhiskerTrace;
+SpikeTrainStruct = SpikeTrainStruct_test.SpikeTrainStruct;
+WhiskerTrace = WhiskerTrace_test.WhiskerTrace;
+% SpikeTrainStruct = SpikeTrain_hard_test.SpikeTrainStruct;
+% WhiskerTrace = WhiskerTrace_hard_test.WhiskerTrace;
 random = 0;
-%trials = [2 7 19 25];
-trials = trials_test_hard; 
+trials = [2 7 19 25];
+% trials = trials_test_hard; 
 [ z_all, neuron_input, curve_trace ] = make_input_output_spikes( N,n_t, n_r, SpikeTrainStruct,trials,dat, Ein, pole, rate, WhiskerTrace, random);
 
 %
@@ -520,8 +521,41 @@ axis 'square';
 title('BPhi')
 
 suptitle('Spikes coloured with BPhi')
-%%
 
+%% Sort neurons based on BPhi value
+
+[~,indx] = sort(BPhi);
+
+
+for i = 1:N
+    %spike_time = zeros(sum(tspike_nz2(:,1) == i));
+    ind = find(tspike_nz2(:,1) == i);
+    spike_time = tspike_nz2(ind,2);
+    spike{i}.time = spike_time;
+    
+end
+        
+%%
+subplot(2,1,1)
+plot((1:1:T),z_all(1:1:T),'g--','LineWidth',2), hold on
+plot(dt*(1:1:i),current(1:1:i,:),'r','LineWidth',1.5), hold off
+legend('Target', 'Output')
+title('Testing')
+ylabel('Ouput')
+xlim(x_lim)
+
+subplot(2,1,2)
+for in = 1:N
+    neuron = in*ones(length(spike{indx(in)}.time) ,1);
+    plot(spike{indx(in)}.time, neuron,'k.')
+    hold on  
+end
+xlabel('Time /ms')
+title('spikes sorted on BPhi value')
+hold off
+
+
+%%
 histogram(BPhi,100,'DisplayStyle','stairs')
 
 %% Plot spikes with each neuron showing its sum of input weights 
@@ -692,6 +726,9 @@ set(gca,'YDir','normal')
 colormap('jet')
 axis 'square';
 title('E feedback')
+
+
+
 
 
 
