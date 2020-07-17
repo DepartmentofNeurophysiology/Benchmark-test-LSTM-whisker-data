@@ -1,0 +1,39 @@
+This is a python notebook which was made in Google colab for faster run times. There are two deep learning models created using the tensorflow.keras package.
+The data being classified has been taken from the crcns.org data-base. They were stored in a google drive account which can be accessed by mounting the account as written on line 29 in the first code cell.
+
+In the second cell, with the heading # define functions, and the third cell after that, all relevant functions are defined. 
+
+Most importantly the 'find_hyper(xtrain, xtest, ytrain, ytest, hyper)' fucntions, which makes a 1D convolutional neural network.
+Here the input parameters are:
+
+  xtrain: the input data to be classified and train the network on.
+  xtest: the input data to be classifed and test the network on.
+  ytrain: the labels corresponding to the xtrain data.
+  ytest: the labels corresponding to the xtest data.
+  hyper: a dictionary containing the hyperparmaters you want to set. This is defined as follows:
+  
+  hyper = {'Batch_size': [32]
+         ,'Filter_number': [ 200]        
+         ,'Filter_size_1': [10]
+         ,'Pooling_1': [3]
+         ,'Filter_size_2': [ 10]
+         ,'Pooling_2': [3]
+         ,'Filter_size_3': [10]
+         #,'Pooling_3': [1]
+         #,'Filter_size_4': [10]
+         ,'layers': [  3]
+         }
+         
+         
+ The same follows for the 'find_hyper_LSTM(x_train_curve, x_train_angle, x_test_curve, x_test_angle, ytrain, ytest, hyper):' function. 
+ Here a LSTM layer is added to the CNN network. The input data is split into curvature and angle data. Th hyper dictionary is defined in a similar manner.
+ 
+ 
+ The data is then imported using the 'import_data' function, and preprocessed using the 'pre_process' function.
+ 
+ Then calling the 'find_average_metrics(find_hyper, find_hyper_LSTM, data, number, LongShort)' function you can train either a number of CNN or LSTM-CNN netwoks. 
+ This functions takes as input the functions mentioned above, a data dictionary defined in the script, the number of networks you want to train, and whether you want an LSTM layer.
+ The function returns the performance metrics of these networks as a dictionary.
+
+ 
+ 
